@@ -11,7 +11,6 @@ from langchain_core.messages import AIMessage, HumanMessage, BaseMessage
 from langchain_core.outputs import ChatResult, ChatGeneration
 from langchain_core.tools import Tool
 from typing import List, Optional, Any
-from google.colab import userdata # Import userdata to access secrets
 
 class GeminiModelWrapper(BaseChatModel):
     sys_instruct: str = "You are a helpful assistant."
@@ -28,13 +27,8 @@ class GeminiModelWrapper(BaseChatModel):
         stop: Optional[List[str]] = None,
         **kwargs: Any,
     ) -> ChatResult:
-        # Use API key for configuration
-        GOOGLE_API_KEY=userdata.get('GOOGLE_API_KEY')
-        genai.configure(api_key=GOOGLE_API_KEY)
-
-        model_name = "gemini-2.5-flash"
-        model = genai.GenerativeModel(model_name) # Initialize the model
-
+        client = genai.Client(vertexai=True, project="playpen-bdba1", location="global")
+        model = "gemini-2.5-flash"
         contents = [
             types.Content(role="model", parts=[types.Part.from_text(text=self.sys_instruct)]),
         ]
@@ -53,10 +47,9 @@ class GeminiModelWrapper(BaseChatModel):
             tools=[types.Tool(google_search=types.GoogleSearch())],
         )
 
-        # Use the initialized model to generate content
-        response = model.generate_content(
-            contents=contents,
-            generation_config=generate_content_config, # Use generation_config instead of config
+        response = client.models.generate_content(
+            model=model, contents=contents,
+            config=generate_content_config,
         )
 
         if hasattr(response, "candidates"):

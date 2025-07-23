@@ -4,11 +4,12 @@ from faker import Faker
 import random
 from datetime import datetime
 import re # Import regex for NI number validation
+import json # Import json for serializing dicts
 
 fake = Faker()
 
 # Constants
-NUM_ROWS = 1000000
+NUM_ROWS = 1000
 TITLES = ['Mr', 'Mrs', 'Ms', 'Dr']
 MARITAL_STATUSES = ['Single', 'Married', 'Divorced', 'Widowed']
 NATIONALITIES = ['UK', 'USA', 'India', 'Australia', 'Canada'] # Consider adding more common UK nationalities
@@ -231,10 +232,13 @@ def generate_row():
     interest_rate = None
     interest_rate_band = "N/A"
 
+    area_risk = AREA_RISK_MAP.get(area, 'Medium') # Default to Medium if area not in map
+    job_risk = JOB_RISK_MAP.get(occupation, 'High') if occupation != 'None' else 'High'
+    company_risk = COMPANY_RISK_MAP.get(company_name, 'High') if company_name != 'None' else 'High'
+
+
     if approved == 'Yes':
-        area_risk = AREA_RISK_MAP.get(area, 'Medium') # Default to Medium if area not in map
-        job_risk = JOB_RISK_MAP.get(occupation, 'High') if occupation != 'None' else 'High'
-        company_risk = COMPANY_RISK_MAP.get(company_name, 'High') if company_name != 'None' else 'High'
+
 
         # Combine risk factors - simple additive model for demonstration
         total_risk_adjustment_value = (
@@ -263,7 +267,7 @@ def generate_row():
     passport_details = {
         "passport_number": fake.passport_number(),
         "issue_date": fake.date_object().strftime("%Y-%m-%d"),
-        "expiry_date": fake.date_object(min_date='today', max_date='+10y').strftime("%Y-%m-%d"),
+        "expiry_date": fake.date_object(random.randint(1, 365 * 10)).strftime("%Y-%m-%d"), # Corrected date_object arguments
         "country_of_issue": random.choice(NATIONALITIES) # Can be different from nationality
     } if random.random() < 0.8 else {} # Simulate some missing data
 

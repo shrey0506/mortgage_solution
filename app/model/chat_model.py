@@ -9,3 +9,4 @@ class ChatResponse(BaseModel):
 class ChatModel:
     def generate_response(self, user_input: str) -> str:
         return f"{user_input}"
+    

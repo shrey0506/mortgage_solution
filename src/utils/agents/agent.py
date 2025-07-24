@@ -1,4 +1,4 @@
-from mortgage.sc.model import GeminiModelWrapper
+from mortgage.src.model.gemini_20 import GeminiModelWrapper
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.prebuilt import create_react_agent
 from langgraph_swarm import create_handoff_tool, create_swarm

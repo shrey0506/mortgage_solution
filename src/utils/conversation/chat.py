@@ -1,4 +1,4 @@
-from mortgage.src.model import GeminiModelWrapper
+from mortgage.src.model.gemini_20 import GeminiModelWrapper
 from langchain_core.messages import HumanMessage
 
 def chat(user_input: str) -> str:

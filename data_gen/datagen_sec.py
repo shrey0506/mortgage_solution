@@ -9,7 +9,7 @@ import json # Import json for serializing dicts
 fake = Faker()
 
 # Constants
-NUM_ROWS = 1000
+NUM_ROWS = 100000
 TITLES = ['Mr', 'Mrs', 'Ms', 'Dr']
 MARITAL_STATUSES = ['Single', 'Married', 'Divorced', 'Widowed']
 NATIONALITIES = ['UK', 'USA', 'India', 'Australia', 'Canada'] # Consider adding more common UK nationalities
@@ -329,3 +329,4 @@ def generate_row():
 # Generate dataset
 data = [generate_row() for _ in range(NUM_ROWS)]
 df = pd.DataFrame(data)
+df.to_csv('data.csv')

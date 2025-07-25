@@ -1,16 +1,16 @@
 from google import genai
-from google.generativeai import types
-from google.generativeai.types import (
+from google.genai import types
+from google.genai.types import (
     GenerateContentConfig, GoogleSearch, HttpOptions, Tool, Blob
 )
 from google.api_core.client_options import ClientOptions
 import mimetypes
+import base64
 import json
 import re
 from langchain.tools import tool
 from langchain_core.messages import HumanMessage
-from mortgage.src.model.gemini_image import image_to_text_with_gemini
-from mortgage.src.utils.helper.boe_interest import fetch_latest_interest_rate
+
 
 def text_extract(image_path: str, doc_type: str) -> str:
     """
@@ -24,13 +24,13 @@ def text_extract(image_path: str, doc_type: str) -> str:
         str: A JSON-formatted string with extracted fields.
     """
     try:
-        # Load image data
+        print("I reached here in ocr")
+
+        mime_type = "image/png"
+
+        # Read image as bytes from saved path
         with open(image_path, "rb") as img_file:
             image_data = img_file.read()
-
-        # Guess MIME type
-        mime_type, _ = mimetypes.guess_type(image_path)
-        mime_type = mime_type or "image/png"
 
         # System-level instruction
         system_instruction = f"""
@@ -102,12 +102,47 @@ def text_extract(image_path: str, doc_type: str) -> str:
         Ensure accuracy in field labeling. Prioritize clearly readable content. Output should strictly follow JSON formatting conventions as described.
         """
 
-        # Pass to Gemini model
-        model = genai.GenerativeModel('gemini-pro-vision', system_instruction=system_instruction)
-        result = model.generate_content(
-            contents=[HumanMessage(content="Please analyze this document for mortgage evaluation."), {"mime_type": mime_type, "data": image_data}]
+
+        contents = [
+            types.Content(
+                role='model',
+                parts=[types.Part.from_text(text=system_instruction)]
+            ),
+            types.Content(
+                role="user",
+                parts=[
+                    types.Part.from_text(text="please analyze this document for mortgage evaluation"),
+                    types.Part(
+                        inline_data=Blob(
+                            mime_type=mime_type,
+                            data=image_data  # direct bytes, not base64
+                        )
+                    )
+                ]
+            )
+        ]
+
+        config = GenerateContentConfig(
+            temperature=0.2,
+            max_output_token=65336,
         )
-        return result.text
+
+        client = genai.Client(vertexai=True, project="ltc-reboot25-team-56", location="global")
+        model_name = "gemini-2.5-flash"
+
+        response = client.models.generate_content(
+            model=model_name,
+            contents=contents,
+            config=config
+        )
+
+        return response.text
 
     except Exception as e:
         return f"Error during OCR extraction: {str(e)}"
+    
+    
+
+
+
+        

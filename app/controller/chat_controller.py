@@ -5,6 +5,7 @@ import json
 import re
 from langchain.schema import HumanMessage
 from mortgage.src.model.gemini_20 import GeminiModelWrapper
+from mortgage.src.utils.helper.ocr import text_extract
 
 global model
 model = GeminiModelWrapper()
@@ -55,3 +56,9 @@ def steer_rate_of_interest_controller(input: str) -> str:
     result = model.generate(messages)
     result = extract_response(result)
     return result
+
+def open_image(app_id: str, doc_type: str, doc_name: str, file_bytes: bytes) -> str:
+    json_result = text_extract(file_bytes, doc_name)
+    return json_result
+
+    

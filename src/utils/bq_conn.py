@@ -39,7 +39,7 @@ def update_sql_query(query_name: str, params: dict) -> str:
     sql_query = format_sql_query(sql_query, params)
     return sql_query
 
-def bigquery_client(table_name: str) -> DataFrame:
+def bigquery_client() -> DataFrame:
     """Gets data from BQ table.
     Args:
         table_name(str): Name of the table of interest.
@@ -47,7 +47,7 @@ def bigquery_client(table_name: str) -> DataFrame:
         DataFrame - response from BQ.
     """
     client = bigquery.Client(location='EU')
-    table_id = f"playpen-bdboa1.{table_name}"
+    table_id = "ltc-reboot25-team-56.mortgage_final.mortgage_dataset"
     query = f"SELECT * FROM `{table_id}`"
     response = client.query(query).to_dataframe()
     return response

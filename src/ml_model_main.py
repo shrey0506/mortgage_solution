@@ -1,104 +1,94 @@
+import os
 import pandas as pd
-import numpy as np
-from typing import Union, Dict, Any
+import pickle
 
-# Assuming MortgagePreprocessingPipeline class and a fitted classification model are available in the environment
-# from your previous steps.
-# Example:
-# preprocessing_pipeline = MortgagePreprocessingPipeline(numerical_cols_with_outliers=...)
-# preprocessing_pipeline.fit(X_train, y_train_cls) # Fit the pipeline on training data
-# trained_classification_model = ... # Your trained classification model (e.g., LGBMClassifier)
+from sklearn.model_selection import train_test_split
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.pipeline import Pipeline
+from sklearn.ensemble import RandomForestRegressor
+from lightgbm import LGBMClassifier
 
-
-def predict_mortgage_approval(
-    raw_input_data: Union[pd.DataFrame, Dict[str, Any]],
-    preprocessing_pipeline: object, # Expecting a fitted preprocessing pipeline instance
-    classification_model: object    # Expecting a fitted classification model instance
-) -> str:
-    """
-    Takes raw input data, preprocesses it using the provided pipeline, and predicts
-    mortgage approval status using the provided classification model.
-
-    Args:
-        raw_input_data (Union[pd.DataFrame, Dict[str, Any]]): Raw input data for one or
-                                                              multiple applicants. Can be
-                                                              a pandas DataFrame or a
-                                                              dictionary (for single applicant).
-        preprocessing_pipeline (object): A fitted instance of the preprocessing pipeline.
-        classification_model (object): A fitted instance of the classification model.
-
-    Returns:
-        str: Prediction result ('Yes' or 'No') for a single applicant, or a string
-             representation of predictions for multiple applicants.
-    """
-    try:
-        # Convert input to DataFrame if it's a dictionary (assuming single applicant)
-        if isinstance(raw_input_data, dict):
-            # Ensure the dictionary can be converted to a DataFrame row
-            # This might require adding a dummy index or ensuring all expected columns are present
-            input_df = pd.DataFrame([raw_input_data])
-        elif isinstance(raw_input_data, pd.DataFrame):
-            input_df = raw_input_data.copy()
-        else:
-            return "Error: Input data must be a pandas DataFrame or a dictionary."
-
-        # Apply the preprocessing pipeline
-        # Note: The pipeline should be already fitted on training data
-        X_processed = preprocessing_pipeline.transform(input_df)
-
-        # Make prediction using the classification model
-        # Assuming the model predicts 0 for 'No' and 1 for 'Yes' based on LabelEncoder
-        prediction_encoded = classification_model.predict(X_processed)
-
-        # Convert prediction back to original labels ('Yes' or 'No')
-        # This requires access to the LabelEncoder fitted on the target variable
-        # A robust approach would be to include the LabelEncoder in the pipeline or pass it.
-        # For simplicity here, assuming 0->No, 1->Yes based on common LabelEncoder behavior.
-        # You might need to adjust this based on your specific LabelEncoder mapping.
-        prediction_label = 'Yes' if prediction_encoded[0] == 1 else 'No' # Assuming single prediction
-
-        if input_df.shape[0] == 1:
-             return f"Predicted Mortgage Approval: {prediction_label}"
-        else:
-             # For multiple rows, return a list or Series of predictions
-             # You would need access to the LabelEncoder's inverse_transform for this
-             # For now, return a simplified representation
-             return f"Predictions (encoded): {prediction_encoded.tolist()}"
+from mortgage.src.utils.bq_conn import bigquery_client
+from mortgage.src.model.ml_model_training import ClassificationPipeline, RegressionPipeline
 
 
-    except Exception as e:
-        return f"Error during prediction: {str(e)}"
+def run_model():
+    # Step 1: Load data from BigQuery
+    input_data = bigquery_client()
+    print("Data loaded from BigQuery.")
+    print(f"Initial shape: {input_data.shape}")
 
-# Example Usage (requires fitting the pipeline and training a model first):
-# Assuming:
-# - 'preprocessing_pipeline' is a fitted instance of MortgagePreprocessingPipeline
-# - 'classification_model' is a fitted instance of a classification model (e.g., LGBMClassifier)
-# - 'raw_new_data' is a dictionary or DataFrame containing new applicant data
+    # Step 2: Inspect target columns
+    print("Sample target values before cleaning:")
+    print(input_data[['mortgage_approved', 'interest_rate']].head())
 
-# Example raw data (replace with actual data structure matching your training data)
-# raw_new_data = {
-#     'title': 'Mr', 'first_name': 'John', 'last_name': 'Doe', 'date_of_birth': '15/07/1990',
-#     'marital_status': 'Married', 'nationality': 'UK', 'gender': 'Male',
-#     'current_address': '123 High St, London', 'residency_status': 'Owner',
-#     'mobile_number': '07700 123456', 'email_address': 'john.doe@example.com',
-#     'number_of_jobs': 1, 'employment_status': 'Employed', 'occupation': 'Tech/Finance',
-#     'contract_type': 'Permanent', 'company_name': 'TechCorp', 'start_date': 'Jan-18',
-#     'basic_yearly_income': '£60,000', 'additional_income': '£5,000',
-#     'expected_retirement_age': 68, 'number_of_child_dependents': 0,
-#     'number_of_adult_dependents': 0, 'is_property_flat_or_leasehold_house': 'No',
-#     'credit_score': 750, 'property_value': '£400,000.00', 'deposit': '£80,000.00',
-#     'deposit_percentage': '20.0%', 'loan_to_value': '80.0%',
-#     'total_borrowing_amount': '£320,000.00', 'who_is_applying': 'Just me',
-#     'property_area': 'London', 'area_risk_score': 'High', 'job_risk_score': 'Medium',
-#     'company_risk_score': 'Low', 'base_rate': '4.25%',
-#     'interest_rate': 'N/A', # Interest rate is the regression target, might not be in raw input for prediction
-#     'repayment_type': 'Capital & Interest', 'repayment_risk_score': 'Good',
-#     'job_risk_score_float': 0.5, 'geo_spatial_risk_score': 0.4,
-#     'income_to_loan_ratio': 0.15, 'approval_reason': 'N/A', 'interest_rate_band': 'N/A',
-#     'passport_details': '{"passport_number": "...", "issue_date": "...", "expiry_date": "...", "country_of_issue": "UK"}',
-#     'social_security_number': 'AB123456A',
-#     'transunion_data': '{"credit_score_band": "Excellent", "adverse_markers": [], "credit_utilization_ratio": 0.3, "years_of_credit_history": 10}'
-# }
-#
-# prediction_result = predict_mortgage_approval(raw_new_data, preprocessing_pipeline, classification_model)
-# print(prediction_result)
+    # Convert interest_rate to numeric, coerce invalid entries
+    input_data['interest_rate'] = pd.to_numeric(input_data['interest_rate'], errors='coerce')
+
+    # Map mortgage_approved from Yes/No or other formats to 1/0
+    if input_data['mortgage_approved'].dtype == object:
+        input_data['mortgage_approved'] = input_data['mortgage_approved'].map({'Yes': 1, 'No': 0, 'yes':1, 'no':0})
+
+    # Drop rows with missing target values
+    input_data = input_data.dropna(subset=['interest_rate', 'mortgage_approved'])
+    print(f"Rows after dropping missing targets: {input_data.shape[0]}")
+
+    if input_data.empty:
+        raise ValueError("No data left after cleaning. Check data quality in BigQuery.")
+
+    # Step 3: Split features and targets
+    y_cls = input_data['mortgage_approved']
+    y_reg = input_data['interest_rate']
+    X = input_data.drop(columns=['mortgage_approved', 'interest_rate'])
+
+    # Step 4: Identify column types
+    numerical_cols = X.select_dtypes(include=['int64', 'float64']).columns.tolist()
+    categorical_cols = X.select_dtypes(include=['object', 'bool']).columns.tolist()
+
+    # Remove problematic columns (e.g., nested JSON fields)
+    for col in ['passport_details', 'transunion_data']:
+        if col in categorical_cols:
+            categorical_cols.remove(col)
+
+    # Step 5: Build preprocessing pipeline
+    full_preprocessor_pipeline = ColumnTransformer(
+        transformers=[
+            ('num', StandardScaler(), numerical_cols),
+            ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_cols)
+        ]
+    )
+
+    # Step 6: Train-test split
+    X_train, X_test, y_train_cls, y_test_cls = train_test_split(X, y_cls, test_size=0.2, random_state=42)
+    _, _, y_train_reg, y_test_reg = train_test_split(X, y_reg, test_size=0.2, random_state=42)
+
+    # Step 7: Train classification pipeline
+    classification_model = LGBMClassifier(random_state=42)
+    classification_pipeline = ClassificationPipeline(model=classification_model, preprocessor=full_preprocessor_pipeline)
+    classification_pipeline.fit(X_train, y_train_cls)
+    classification_pipeline.evaluate(X_test, y_test_cls)
+
+    # Step 8: Train regression pipeline
+    regression_model = RandomForestRegressor(random_state=42)
+    regression_pipeline = RegressionPipeline(model=regression_model, preprocessor=full_preprocessor_pipeline)
+    regression_pipeline.fit(X_train, y_train_reg)
+    regression_pipeline.evaluate(X_test, y_test_reg)
+
+    # Step 9: Save trained models
+    base_path = os.path.join('mortgage', 'src', 'model')
+    os.makedirs(base_path, exist_ok=True)
+
+    with open(os.path.join(base_path, 'classification_pipeline.pkl'), 'wb') as f_cls:
+        pickle.dump(classification_pipeline, f_cls)
+
+    with open(os.path.join(base_path, 'regression_pipeline.pkl'), 'wb') as f_reg:
+        pickle.dump(regression_pipeline, f_reg)
+
+    # Step 10: Predict on entire dataset (optional)
+    y_pred_cls = classification_pipeline.predict(X)
+    y_pred_reg = regression_pipeline.predict(X)
+
+    print("Model training and prediction complete.")
+
+    return y_pred_cl

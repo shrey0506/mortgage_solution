@@ -1,0 +1,1 @@
+select * from `{{bq_project_id}}.{{bq_dataset}}.{{table_name}}`'

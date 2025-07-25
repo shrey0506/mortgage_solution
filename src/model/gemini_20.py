@@ -1,28 +1,25 @@
-from typing import List, Optional, Any
-import google.generativeai as genai
+from google import genai
+from google.genai import types
+from google.genai.types import (
+    GenerateContentConfig,
+    GoogleSearch,
+    HttpOptions,
+    Tool as GeminiTool,
+)
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, BaseMessage
 from langchain_core.outputs import ChatResult, ChatGeneration
 from langchain_core.tools import Tool
-from pydantic import PrivateAttr
-
+from typing import List, Optional, Any
 
 class GeminiModelWrapper(BaseChatModel):
     sys_instruct: str = "You are a helpful assistant."
-
-    # ✅ Declare internal-only (non-validated) attributes
-    _tools: Optional[List[Tool]] = PrivateAttr(default=None)
-    _model: Any = PrivateAttr(default=None)
+    _tools: Optional[List[Tool]] = None
 
     def __init__(self, sys_instruct: str = "You are a helpful assistant."):
         super().__init__()
-        self.sys_instruct = sys_instruct
-
-        # ✅ Configure API key for Google Gemini
-        genai.configure(api_key="AIzaSyB7zB8ZzqXoLZ-hkH2iMtgiHsyTemAB6-0")
-
-        # ✅ Store model reference in private attribute
-        self._model = genai.GenerativeModel("gemini-1.5-flash")  # or "gemini-pro"
+        setattr(self, "sys_instruct", sys_instruct)
+        setattr(self, "_tools", None)
 
     def _generate(
         self,
@@ -30,22 +27,50 @@ class GeminiModelWrapper(BaseChatModel):
         stop: Optional[List[str]] = None,
         **kwargs: Any,
     ) -> ChatResult:
-        chat_history = [{"role": "model", "parts": [self.sys_instruct]}]
+        client = genai.Client(vertexai=True, project="ltc-reboot25-team-56", location="global")
+        model = "gemini-2.5-flash"
+        contents = [
+            types.Content(role="model", parts=[types.Part.from_text(text=self.sys_instruct)]),
+        ]
         for msg in messages:
             role = "user" if msg.type == "human" else "model"
-            chat_history.append({"role": role, "parts": [msg.content]})
+            contents.append(types.Content(role=role, parts=[types.Part.from_text(text=msg.content)]))
 
-        # ✅ Call the Gemini API
-        response = self._model.generate_content(chat_history)
+        generate_content_config = types.GenerateContentConfig(
+            temperature=1, top_p=1, seed=0, max_output_tokens=2048,
+            safety_settings=[
+                types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="OFF"),
+                types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="OFF"),
+                types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="OFF"),
+                types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="OFF"),
+            ],
+            tools=[types.Tool(google_search=types.GoogleSearch())],
+        )
 
+        response = client.models.generate_content(
+            model=model, contents=contents,
+            config=generate_content_config,
+        )
+
+        if hasattr(response, "candidates"):
+            candidate = response.candidates[0]
+            if hasattr(candidate, "function_call"):
+                tool_call = candidate.function_call
+                return ChatResult(
+                    generations=[
+                        ChatGeneration(
+                            message=AIMessage(content="", additional_kwargs={"tool_calls": [{"name": tool_call.name, "args": tool_call.args,}]},)
+                        )
+                    ]
+                )
         return ChatResult(
             generations=[ChatGeneration(message=AIMessage(content=response.text))]
         )
 
     def bind_tools(self, tools: List[Tool], **kwargs: Any) -> "GeminiModelWrapper":
-        self._tools = tools
+        object.__setattr__(self, "_tools", tools)
         return self
 
     @property
     def _llm_type(self) -> str:
-        return "gemini-api"
+        return "vertex-gemini"

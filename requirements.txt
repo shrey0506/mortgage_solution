@@ -25,9 +25,10 @@ fastapi
 uvicorn
 gunicorn
 # plotly_get_chrome
-kaleidols
 scikit-learn
 beautifulsoup4
 pandas
 numpy
 xgboost
+python-mutlipart
+lightgbm

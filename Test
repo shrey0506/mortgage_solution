@@ -1,0 +1,36 @@
+import networkx as nx
+import matplotlib.pyplot as plt
+
+# Build directed graph
+G = nx.DiGraph()
+for _, row in df.iterrows():
+    parent = str(row["pnt_ou_id"])
+    child = str(row["child_ou_id"])
+    G.add_edge(parent, child)
+
+# Recursive function for hierarchical pos
+def hierarchy_pos(G, root=None, width=1., vert_gap=0.3, vert_loc=0, xcenter=0.5):
+    pos = {}
+    def _hierarchy_pos(G, node, left, right, vert_loc, pos, parent=None):
+        children = list(G.neighbors(node))
+        if not children:
+            pos[node] = ((left+right)/2, vert_loc)
+        else:
+            dx = (right-left)/len(children)
+            nextx = left
+            pos[node] = ((left+right)/2, vert_loc)
+            for child in children:
+                pos = _hierarchy_pos(G, child, nextx, nextx+dx, vert_loc-vert_gap, pos, node)
+                nextx += dx
+        return pos
+    if root is None:
+        root = [n for n,d in G.in_degree() if d==0][0]  # pick a root (no parent)
+    return _hierarchy_pos(G, root, 0, width, vert_loc, pos)
+
+# Get positions
+pos = hierarchy_pos(G)
+
+# Draw
+plt.figure(figsize=(15, 10))
+nx.draw(G, pos, with_labels=True, arrows=True, node_size=1500, node_color="lightblue", font_size=8)
+plt.show()
